@@ -6,13 +6,46 @@
 #include<WinSock2.h>//需要在#include<Windows.h>前
 
 #pragma comment(lib,"ws2_32.lib")//加入一个静态库
+using std::cout;
+using std::endl;
+//DataPackage
 struct DataPackage
 {
 	int age;
 	char name[32];
 };
+enum CMD
+{
+	CMD_LOGIN,
+	CMD_LOGOUT,
+	CMD_ERROR
+
+};
+struct Dataheader
+{
+	short dataLength;//数据长度
+	short cmd;//命令
+};
+struct Login
+{
+	char userName[32];
+	char passWord[32];
+};
+struct LoginResult
+{
+	int result;
+};
+struct Logout
+{
+	char userName[32];
+};
+struct LogoutResult
+{
+	int result;
+};
 int main()
 {
+	//std::cout << sizeof(Login) << std::endl;
 	WORD ver = MAKEWORD(2, 2);//传入2.2版本号
 	WSADATA dat;
 	//启动windows socket环境
@@ -56,14 +89,45 @@ int main()
 	char _recvBuf[128] = {};
 	while (1)
 	{
+		Dataheader header = {};
+
 		//接收客户端数据
-		int nLen = recv(_csocket, _recvBuf, 128, 0);
+		int nLen = recv(_csocket, (char*)&header, sizeof(Dataheader), 0);
 		if (nLen <= 0)
 		{
 			std::cout << "客户端已退出 ，任务结束" << std::endl;
 			break;
 		}
-		
+		cout <<"收到命令: "<< header.cmd <<" 数据长度: "<<header.dataLength<< endl;
+		switch (header.cmd)
+		{
+		case CMD_LOGIN:
+		{
+			Login login = {};
+			recv(_csocket, (char*)&login, sizeof(Login), 0);
+			//忽略判断用户密码是否正确
+			LoginResult ret = {0};
+			send(_csocket, (char*)&header, sizeof(Dataheader), 0);
+			send(_csocket, (char*)&ret, sizeof(LoginResult), 0);
+		}
+		break;
+		case CMD_LOGOUT:
+		{
+			Logout logout = {};
+			recv(_csocket, (char*)&logout, sizeof(Logout), 0);
+			//忽略判断用户密码是否正确
+			LogoutResult ret = { 1 };
+			send(_csocket, (char*)&header, sizeof(Dataheader), 0);
+			send(_csocket, (char*)&ret, sizeof(LogoutResult), 0);
+		}
+		break;
+		default:
+			header.cmd = CMD_ERROR;
+			header.dataLength = 0;
+			send(_csocket, (char*)&header, sizeof(Dataheader), 0);
+			break;
+		}
+		/*
 		//处理请求
 		if (0 == strcmp(_recvBuf, "name"))
 		{
@@ -84,6 +148,7 @@ int main()
 		//5. send 向客户端发送一条数据
 		else
 			send(_csocket, msgBuf, strlen(msgBuf) + 1, 0);//加上结尾符
+			*/
 	}	
 	//6. 关闭套接字
 	closesocket(_sock);
